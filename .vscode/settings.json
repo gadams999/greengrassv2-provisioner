@@ -1,3 +1,7 @@
 {
-    "python.pythonPath": "/Users/gavinaws/.pyenv/versions/ggv2-provisioner/bin/python"
+    "python.pythonPath": "/Users/gavinaws/.pyenv/versions/ggv2-provisioner/bin/python",
+    "cSpell.words": [
+        "EACCES",
+        "ENOENT"
+    ]
 }

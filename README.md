@@ -6,7 +6,7 @@ Once completed, the initial start of Greengrass will read the contents of `GREEN
 
 # Quick start
 
-First, install AWS IoT Greengrass as a local service, but _do not_ start prior to running the provisioner. Follow the [Setting up AWS IoT Greengrass Version 2](https://docs.aws.amazon.com/greengrass/v2/developerguide/setting-up.html) to verify all dependencies are installed. Next, complete [Install the AWS IoT Greengrass Core software](https://docs.aws.amazon.com/greengrass/v2/developerguide/install-greengrass-core-v2.html) steps 1 and 2, then _**skip step 3**_ and run the following command to install the AWS IoT Greengrass Core software:
+First, install AWS IoT Greengrass as a local service, but _do not_ start prior to running the provisioner. Follow the [Setting up AWS IoT Greengrass Version 2](https://docs.aws.amazon.com/greengrass/v2/developerguide/setting-up.html) to verify all dependencies are installed. Next, complete [Install the AWS IoT Greengrass Core software](https://docs.aws.amazon.com/greengrass/v2/developerguide/install-greengrass-core-v2.html) steps 1 and 2, then **STOP** (_do not perform step 3_) and run the following command to install the AWS IoT Greengrass Core software:
 
 ```shell
 sudo -E java -Droot="/greengrass/v2" -Dlog.store=FILE \
@@ -20,7 +20,7 @@ This will install the software but will not provision or start the local instanc
 
 Next, run the provisioner which will do the following:
 
-1. Validate that Greengrass is not running
+1. Validate that Greengrass is not running and the install is in a pristine state
 1. Remove all files in `$ROOT/config`
 1. Based on input for either creating resources or just referencing, create a new `$ROOT/config/config.yaml` file
 1. If selected, create a system startup command for Greengrass.

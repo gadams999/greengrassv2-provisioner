@@ -30,6 +30,7 @@ from pathlib import Path
 import tqdm
 import colorlog
 import provisioner_argparse
+import helpers
 
 
 class TqdmLoggingHandler(logging.Handler):
@@ -47,7 +48,7 @@ class TqdmLoggingHandler(logging.Handler):
             self.handleError(record)
 
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("ggv2-provisioner")
 log.setLevel(logging.INFO)
 handler = TqdmLoggingHandler()
 handler.setFormatter(
@@ -68,8 +69,14 @@ log.addHandler(handler)
 
 
 def main():
+
+    # Process arguments
     arguments = provisioner_argparse.parse_arguments()
-    print(arguments)
+    log.debug(f"command arguments: {arguments}")
+
+    # Verify that Greengrass exists and is pristine
+    if not helpers.verify_greengrass(arguments.root_dir):
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -19,6 +19,7 @@ import argparse
 import sys
 import re
 import errno
+import logging
 from pathlib import Path
 
 
@@ -81,9 +82,31 @@ def is_file_ro(filename: Path) -> Path:
             raise argparse.ArgumentTypeError(f"error accessing {filename}")
 
 
+def set_debug(level: str) -> str:
+    """Set debug level for all logging
+
+    Args:
+        level (str): logging level per https://docs.python.org/3/howto/logging.html
+    """
+    log = logging.getLogger("ggv2-provisioner")
+    log.setLevel(level)
+    return level
+
+
 def parse_arguments():
     """Parse and validate argument list required for provisioner"""
     parser = argparse.ArgumentParser()
+
+    # Optional arguments
+    parser.add_argument(
+        "--debug",
+        required=False,
+        help="debug level",
+        type=set_debug,
+        default="WARNING",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+    )
+
     # Required arguments
     requiredGroup = parser.add_argument_group("required named arguments")
     requiredGroup.add_argument(
