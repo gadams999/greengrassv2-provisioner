@@ -75,7 +75,13 @@ def main():
     log.debug(f"command arguments: {arguments}")
 
     # Verify that Greengrass exists and is pristine
+    print("Verifying Greengrass is installed and in unmodified state")
     if not helpers.verify_greengrass(arguments.root_dir):
+        sys.exit(1)
+
+    # Verify that AWS credentials are available for use
+    print("Verifying AWS credentials are available for use")
+    if not helpers.verify_aws_credentials(arguments.region):
         sys.exit(1)
 
 

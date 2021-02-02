@@ -18,6 +18,7 @@ License:
 import os
 import logging
 import tempfile
+import boto3
 from pathlib import Path
 
 log = logging.getLogger("ggv2-provisioner")
@@ -30,7 +31,7 @@ def verify_greengrass(gg_root: Path) -> bool:
         gg_root (Path): Greengrass v2 root directory
 
     Returns:
-        bool: True if installation is correct otherwise exit() with error set
+        bool: True if Greengrass is installed but not configured
     """
 
     # Verify GG root exists and we can read/write files in the config/ directory
@@ -42,12 +43,65 @@ def verify_greengrass(gg_root: Path) -> bool:
     temp_name = Path(gg_root + "/config/" + next(tempfile._get_candidate_names()))
     try:
         open(temp_name, "a").close()
+    except Exception as e:
+        log.error(
+            f"{str(e)}, unable to access and create files in {str(gg_root + '/config')}"
+        )
+        return False
+    # Make sure files can be deleted too
+    try:
         temp_name.unlink()
     except Exception as e:
         log.error(
-            f"{str(e)}, unable to modify {str(gg_root + '/config')}\ntry \"sudo ggv2_provisioner\""
+            f"{str(e)}, unable to delete files in {str(gg_root + '/config')}, please resolve permissions and rerun"
         )
         return False
 
+    # Look for existing deployments
+    try:
+        if len(os.listdir(gg_root + "/deployments")) == 0:
+            log.info(f"{str(gg_root + '/deployments')} exists and is empty, proceed")
+        else:
+            log.error(
+                f"Greengrass appears to be configured, deployments found, {str(gg_root + '/deployments')} must be empty"
+            )
+            return False
+    except Exception as e:
+        log.error(f"{str(e)}, please review Greengrass installation")
+        return False
+
+    # Clean out the /config directory
+    log.info("Removing all files from the {str(gg_root + '/config')} directory")
+    try:
+        for child in Path(gg_root + "/config").glob("*"):
+            if child.is_file():
+                log.debug(f"Removing file {child}")
+                child.unlink()
+    except Exception as e:
+        log.error(f"{str(e)}, could not empty {str(Path(gg_root + '/config/'))}")
+        return False
+
     # All tests passed
+    return True
+
+
+def verify_aws_credentials(region: str) -> bool:
+    """Verifies that AWS credentials are available, but not
+    that the credentials can perform all operations
+
+    Returns:
+        bool: True if credentials exist
+    """
+
+    try:
+        sts = boto3.client(
+            "sts",
+            region_name=region,
+            endpoint_url=f"https://sts.{region}.amazonaws.com/",
+        )
+        sts.get_caller_identity()
+        log.info("STS GetCallerIdentity returned valid credentials")
+    except boto3.exceptions.ClientError as e:
+        log.error(f"{e}, AWS credentials not properly configured, exiting")
+        return False
     return True

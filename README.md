@@ -16,7 +16,7 @@ sudo -E java -Droot="/greengrass/v2" -Dlog.store=FILE \
   --start false
 ```
 
-This will install the software but will not provision or start the local instance of Greengrass. At this point, the image or distro can be completed. The next set of steps require connectivity to the Internet to complete.
+This will install the software but will not provision or start the local instance of Greengrass. At this point, the image or distribution can be completed. The next set of steps require connectivity to the Internet to complete.
 
 Next, run the provisioner which will do the following:
 
@@ -24,7 +24,8 @@ Next, run the provisioner which will do the following:
 1. Remove all files in `$ROOT/config`
 1. Based on input for either creating resources or just referencing, create a new `$ROOT/config/config.yaml` file
 1. If selected, create a system startup command for Greengrass.
-   1. If selected, start Greengrass locally
+   1. If selected, start Greengrass locally after provisioning
+   1. Otherwise Greengrass can be manually started or will start in system reboot.
 
 # Caveats
 
