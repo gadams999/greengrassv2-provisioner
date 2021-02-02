@@ -39,13 +39,14 @@ def verify_greengrass(gg_root: Path) -> bool:
         return False
 
     # Test access to /config
-    temp_name = gg_root + "/config/" + next(tempfile._get_candidate_names())
+    temp_name = Path(gg_root + "/config/" + next(tempfile._get_candidate_names()))
     try:
-        if not open(temp_name, "a").close():
-            log.error(f"unable to create files in {str(gg_root + '/config')}")
-            return False
+        open(temp_name, "a").close()
+        temp_name.unlink()
     except Exception as e:
-        log.error(f"Error is {e}, cannot write file")
+        log.error(
+            f"{str(e)}, unable to modify {str(gg_root + '/config')}\ntry \"sudo ggv2_provisioner\""
+        )
         return False
 
     # All tests passed
