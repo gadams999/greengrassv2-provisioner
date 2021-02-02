@@ -39,9 +39,13 @@ def verify_greengrass(gg_root: Path) -> bool:
         return False
 
     # Test access to /config
-    temp_name = gg_root + "/config" + next(tempfile._get_candidate_names())
-    if not open(temp_name, "a").close():
-        log.error(f"unable to create files in {str(gg_root + '/config')}")
+    temp_name = gg_root + "/config/" + next(tempfile._get_candidate_names())
+    try:
+        if not open(temp_name, "a").close():
+            log.error(f"unable to create files in {str(gg_root + '/config')}")
+            return False
+    except Exception as e:
+        log.error(f"Error is {e}, cannot write file")
         return False
 
     # All tests passed
