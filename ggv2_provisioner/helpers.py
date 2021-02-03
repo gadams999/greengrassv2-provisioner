@@ -105,4 +105,7 @@ def verify_aws_credentials(region: str) -> bool:
     except botocore.exceptions.ClientError as e:
         log.error(f"{e}, AWS credentials not properly configured, exiting")
         return False
+    except botocore.exceptions.NoCredentialsError as e:
+        log.error(f"{e}, AWS credentials needed to complete provisioning steps")
+        return False
     return True
