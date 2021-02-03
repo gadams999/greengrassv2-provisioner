@@ -18,6 +18,7 @@ License:
 import os
 import logging
 import tempfile
+import botocore
 import boto3
 from pathlib import Path
 
@@ -101,7 +102,7 @@ def verify_aws_credentials(region: str) -> bool:
         )
         sts.get_caller_identity()
         log.info("STS GetCallerIdentity returned valid credentials")
-    except boto3.exceptions.ClientError as e:
+    except botocore.exceptions.ClientError as e:
         log.error(f"{e}, AWS credentials not properly configured, exiting")
         return False
     return True
