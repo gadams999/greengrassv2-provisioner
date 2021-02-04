@@ -174,25 +174,22 @@ def parse_arguments():
         help="path to root CA file for endpoint validation",
     )
 
-    # Role Alias via ARN or newly named alias. If new alias, --role-alias-policy needs to be entered
-    role_alias_group = requiredGroup.add_mutually_exclusive_group(required=True)
-    role_alias_group.add_argument(
-        "--role-alias-arn",
-        help="existing AWS IoT Role Alias ARN to use for AWS service permissions",
-    )
-    role_alias_group.add_argument(
-        "--role-alias-name", help="name of AWS IoT Role Alias to create"
+    # AWS IoT Role Alias and IAM Role / policy
+    requiredGroup.add_argument(
+        "--iot-role-alias-name",
+        required=True,
+        help="name of AWS IoT Role Alias to create",
     )
     requiredGroup.add_argument(
-        "--role-alias-policy-file",
+        "--iam-policy-file",
         required="--role-alias-name" in sys.argv,
         type=is_file_ro,
-        help="JSON formatted IAM policy file to attach inline to the role alias",
+        help="JSON formatted IAM policy file to attach inline to the IAM Role",
     )
     requiredGroup.add_argument(
         "--iam-role-name",
         required=False,
-        help="the name to assign to the IAM role referenced by the newly create role alias",
+        help="IAM role name to create or use if it already exists for the AWS IoT Role Alias",
     )
 
     requiredGroup.add_argument(

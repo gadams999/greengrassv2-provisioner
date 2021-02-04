@@ -84,6 +84,12 @@ def main():
     if not helpers.verify_aws_credentials(arguments.region):
         sys.exit(1)
 
+    # Start provisioning process - Builds a dictionary of results to then use to process a
+    # new config.yaml file, populate files, or return a singular object for light-weight app
+    # to process.
+
+    result = helpers.provision_greengrass(arguments)
+
 
 if __name__ == "__main__":
     main()
