@@ -134,27 +134,23 @@ def parse_arguments():
     # Otherwise, is assumed there are no credentials and a new certifcate and private key will be created
     credentials_group = parser.add_argument_group()
     credentials_group.add_argument(
-        "--certificate-arn",
-        help="existing AWS Certificate ARN to use",
+        "--certificate-id",
+        help="existing AWS Certificate to use (by name)",
     )
     credentials_group.add_argument(
         "--certificate-file",
-        required="--certificate-arn" in sys.argv,
+        required="--certificate-id" in sys.argv,
         type=is_file_ro,
         help="path to existing certificate file to copy into Greengrass directory",
     )
     credentials_group.add_argument(
         "--private-key-file",
-        required="--certificate-arn" in sys.argv,
+        required="--certificate-id" in sys.argv,
         type=is_file_ro,
         help="path to existing private key file to copy into Greengrass directory",
     )
 
-    iot_policy_group = requiredGroup.add_mutually_exclusive_group(required=True)
-    iot_policy_group.add_argument(
-        "--iot-policy-arn", help="existing AWS IoT Policy ARN to attach to certificate"
-    )
-    iot_policy_group.add_argument(
+    requiredGroup.add_argument(
         "--iot-policy-name", help="name of AWS IoT Policy to create"
     )
     requiredGroup.add_argument(

@@ -52,8 +52,35 @@ Locally, a script would take in:
 - thingName to create
 - thingGroup to create and place the thingName in, existing thingGroup, or optionally no thingGroup
 - iotPolicy file to create, arn of existing policy, or create a default policy with minimal permissions needed
+
+The AWS IoT Policy needs to contain normal `iot:` actions for connect, publish, subscribe, but also must contain the `iot:AssumeRoleWithCertificate` action and reference the AWS IoT Role Alias to use or be created. Here is an example default policy:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "iot:Connect",
+        "iot:Publish",
+        "iot:Subscribe",
+        "iot:Receive",
+        "greengrass:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["iot:AssumeRoleWithCertificate"],
+      "Resource": "arn:aws:iot:REGION:AWS_ACCOUNT:rolealias/your_role_alias_name"
+    }
+  ]
+}
+```
+
 - Certificate to create (AWS IoT), CSR to use for AWS IoT, arn of existing certificate, or certificate/key from BYoCA
-- Role alias name to include as policy attached to certificate (if new role alias, it will create the IAM role and an inline policy with this default policy:
+- Role alias name to include as policy attached to certificate (if new role alias, it will create the IAM role and an inline policy with this default policy (note - this is overly permissive and should only be used for testing purposes):
 
 ```json
 {
