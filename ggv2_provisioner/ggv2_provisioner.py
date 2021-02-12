@@ -23,7 +23,7 @@ License:
 """
 
 import logging
-import time
+import json
 import sys
 from pathlib import Path
 
@@ -88,7 +88,8 @@ def main():
     # new config.yaml file, populate files, or return a singular object for light-weight app
     # to process.
 
-    result = helpers.provision_greengrass(arguments)
+    response = helpers.provision_greengrass(arguments)
+    print(json.dumps(response))
 
 
 if __name__ == "__main__":

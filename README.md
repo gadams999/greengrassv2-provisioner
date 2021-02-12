@@ -1,12 +1,28 @@
-# AWS IoT Greengrass 2.0 provisioner
+# AWS IoT Greengrass 2 Provisioner
 
-Command line interface to safely provision a newly installed (but not configured) Greengrass service. By default the provisioner requires all basic values for Greengrass to work with the AWS Cloud services, checks that the proper permissions are available, and then provisions the `config.yaml` and credentials for the new instance.
+The AWS IoT Greengrass 2 Provisioner (Provisioner) is command line interface to safely provision a newly installed (but not presently configured) AWS IoT Greengrass service. The _Provisioner_ performs all the steps to fully provision all AWS Cloud resources and then create the local files in the AWS IoT Greengrass root directory that reference and use the returned credentials.
 
-Once completed, the initial start of Greengrass will read the contents of `GREENGRASS_ROOT/config/config.yaml` and connect to AWS IoT Greengrass services.
+Once completed, the initial start of AWS IoT Greengrass will read the contents of `GREENGRASS_ROOT/config/config.yaml` and connect to AWS IoT Greengrass services.
 
-# Quick start
+## Installation
 
-First, install AWS IoT Greengrass as a local service, but _do not_ start prior to running the provisioner. Follow the [Setting up AWS IoT Greengrass Version 2](https://docs.aws.amazon.com/greengrass/v2/developerguide/setting-up.html) to verify all dependencies are installed. Next, complete [Install the AWS IoT Greengrass Core software](https://docs.aws.amazon.com/greengrass/v2/developerguide/install-greengrass-core-v2.html) steps 1 and 2, then **STOP** (_do not perform step 3_) and run the following command to install the AWS IoT Greengrass Core software:
+You can install the _Provisioner_ from [PyPI](link_goes_here):
+
+```shell
+pip install ggv2-provisioner
+```
+
+The reader is supported on Python 3.6 and above.
+
+## How to use
+
+## Install AWS IoT Greengrass
+
+Prior to running the _Provisioner_, first install that AWS IoT Greengrass is installed but not configured or installed.
+
+Follow the [Setting up AWS IoT Greengrass Version 2](https://docs.aws.amazon.com/greengrass/v2/developerguide/setting-up.html) to verify all dependencies are installed, and next complete the [Install the AWS IoT Greengrass Core software](https://docs.aws.amazon.com/greengrass/v2/developerguide/install-greengrass-core-v2.html) steps 1 and 2, then **STOP** (_do not perform step 3_).
+
+From the directy where you unzipped the AWS IoT Greengrass distribution, run the following command to install the AWS IoT Greengrass Core software into the `root` dirctory (change as needed):
 
 ```shell
 sudo -E java -Droot="/greengrass/v2" -Dlog.store=FILE \
@@ -16,22 +32,116 @@ sudo -E java -Droot="/greengrass/v2" -Dlog.store=FILE \
   --start false
 ```
 
-This will install the software but will not provision or start the local instance of Greengrass. At this point, the image or distribution can be completed. The next set of steps require connectivity to the Internet to complete.
+This will install the AWS IoT Greengrass software in `root`, but will not provision or start the local instance of AWS IoT Greengrass. The next set of steps require connectivity to the Internet to complete.
 
-Next, run the provisioner which will do the following:
+## Provision a New AWS IoT Greengrass Core
 
-1. Validate that Greengrass is not running and the install is in a pristine state
-1. Remove all files in `$ROOT/config`
-1. Based on input for either creating resources or just referencing, create a new `$ROOT/config/config.yaml` file
-1. If selected, create a system startup command for Greengrass.
-   1. If selected, start Greengrass locally after provisioning
-   1. Otherwise Greengrass can be manually started or will start in system reboot.
+Next, run the _Provisioner_ which will do the following:
 
-# Caveats
+1. Validate that AWS IoT Greengrass is not running and the installation is in a pristine state
+1. Remove all files in `$ROOT/config` in preparation for the local files
+1. Based on input for creating ore referencing, create a new `$ROOT/config/config.yaml` file used for the initial deployment of the Nucleus
+1. If selected, create a system systemd startup command for AWS IoT Greengrass.
 
-The provisioner is currently prescriptive in what it does. At present, there are some constraints:
+### Option 1 - Provision All Resources
 
-- Component default user/group - These must be set initially through the _Greengrass.jar_ `--component-default-user ggc_user:ggc_group` setup argument then passed through to the _ggv2_provisioner_ `--component-default-user` argument (default value of ggc_user:ggc_group).
+If you need to deploy all the required resources to run AWS IoT Greengrass, use this process. The command will provision the following new resources:
+
+- IAM Role with policy of provided permissions to be used by the AWS IoT Role Alias
+- AWS IoT specific resources:
+  - AWS IoT Role Alias used by AWS IoT Greengrass components to access other AWS services
+  - AWS IoT Thing which maps to the AWS IoT Greengrass Core
+  - AWS IoT Certificate (PEM encoded certificate and private key)
+  - AWS IoT Policy used by the AWS IoT Greengrass Core to interact with `iot` and `greengrass` actions
+  - Attach the Certificate to the Thing and Policy
+
+As the configuration requires unique values from your account, use the AWS CLI to obtain the following values:
+
+```shell
+export GG_REGION=<you-aws-region>
+export IOT_CREDENTIAL_ENDPOINT=$(aws iot --region $GG_REGION describe-endpoint --endpoint-type iot:CredentialProvider --query 'endpointAddress' --output text)
+export IOT_DATA_ENDPOINT=$(aws iot --region $GG_REGION describe-endpoint --endpoint-type iot:Data-ATS --query 'endpointAddress' --output text)
+```
+
+Next, run the _Provisioner_ command to complete the operations.
+
+Note: The command line below references sample IAM and IoT policy documents located in the `samples/` directory. Please review and change the actions and resources as needed. Also, you will need, at minimum, the local AWS permissions listed in the **FAQ Permissions** section.
+
+```shell
+# Run from the ggv2_provisioner directory
+# Replace all "Test-" values with what you want to call the resources
+./ggv2_provisioner.py \
+  --root-dir /greengrass/v2 \
+  --region $GG_REGION \
+  --thing-name "Test-gg-device" \
+  --download-root-ca \
+  --iot-role-alias-name "Test-gg-role-alias" \
+  --iam-role-name "Test-gg-role" \
+  --iam-policy-file ./iam_base_permissions.json \
+  --iot-policy-name "Test-iot-policy" \
+  --iot-policy-file ./iot_base_permissions.json \
+  --iot-data-endpoint $IOT_DATA_ENDPOINT \
+  --iot-cred-endpoint $IOT_CREDENTIAL_ENDPOINT
+```
+
+This will complete _all_ operations needed for a new AWS IoT Greengrass Core to operate.
+
+### Option 2 - Provision a Thing with an Existing IoT Role Alias
+
+If you already have some of the resources provisions, such as the IAM Role and AWS IoT Role Alias, referencing them by name will have the _Provisioner_ validate the resource exists and then use that. For instance, if an AWS IoT Role Alias name `Test-gg-role-alias` has already been provisioned and references an IAM Role, you can just reference `--iot-role-alias-name "Test-gg-role-alias"`. In this case, the provisioning command would look like:
+
+```shell
+# Run from the ggv2_provisioner directory
+# Replace all "Test-" values with what you want to call the resources
+./ggv2_provisioner.py \
+  --root-dir /greengrass/v2 \
+  --region $GG_REGION \
+  --thing-name "Test-gg-device2" \
+  --download-root-ca \
+  --iot-role-alias-name "Test-gg-role-alias" \
+  --iot-policy-name "Test-iot-policy" \
+  --iot-data-endpoint $IOT_DATA_ENDPOINT \
+  --iot-cred-endpoint $IOT_CREDENTIAL_ENDPOINT
+```
+
+If this command was run after the one above, it will create a new thing named `Test-gg-device2` and a certificate, but will use the _existing_ AWS IoT Role Alias and attach the `Test-iot-policy` AWS IoT Policy to the new certificate. The _Provisioner_ will verify arguments and report with any errors or missing values.
+
+This option can be used provisioning new devices that use the same resources such as fleet provisioning.
+
+## Caveats
+
+The _Provisioner_ is prescriptive in certain approaches to the provisioning process. You may need to take these into consideration.
+
+- **Component default user/group** - These must be set initially through the _Greengrass.jar_ installation process by providing the `--component-default-user ggc_user:ggc_group` setup argument. The _Provisioner_ does not support changing of the default user and group.
+- **AWS permissions** - The _Provisioner_ requires different AWS permissions to perform the various resource creation steps. Please ensure you current AWS credentials are sufficient to perform all the steps.
+- **No roll-back of resources** - The _Provisioner_ creates resources in an synchronous manner. If a steps fails halfway through the process, the previously created resources are not rolled back and deleted. It is recommended to review and correct issues at they arise
+- **Local file naming and location** - The certificate, private key, and Root CA files use static names (e.g., `ThingName-certificate.pem`, `ThingName-private-key.pem`, and `RootCA.pem`). Also, the files are place into to root directory and referenced with absolute file name paths.
+
+## Troubleshooting and Frequently Asked Questions
+
+### What are the minimum permissions required to run the Provisioner?
+
+These are the [IAM Actions](https://docs.aws.amazon.com/service-authorization/latest/reference/reference_policies_actions-resources-contextkeys.html) required to run all steps of the _Provisioner_. If some operations are not being performed, such as the creation of an IAM Role, those can removed from the minimum.
+
+| Action                         | Description                                                                       | Access Level | Provisioner Use                                                                                              |
+| ------------------------------ | --------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------ |
+| `sts:GetCallerIdentity`        | Returns details about the IAM identity whose credentials are used to call the API | Read         | Build resource Arns for IAM and IoT policies                                                                 |
+| `iot:DescribeRoleAlias`        | from docs                                                                         | Read         | Determine if AWS IoT Role Alias already exists                                                               |
+| `iam:GetRole`                  | from docs                                                                         | Read         | Determine if IAM Role already exists                                                                         |
+| `iam:CreateRole`               | from docs                                                                         | Write        | Create new IAM Role for AWS IoT Role Alias                                                                   |
+| `iam:PutRolePolicy`            | from docs                                                                         | Write        | Add contents of `--iam-policy-file` to newly created IAM Role                                                |
+| `iot:CreateRoleAlias`          | from docs                                                                         | Write        | Create new AWS IoT Role Alias                                                                                |
+| `iot:DescribeThing`            | from docs                                                                         | Read         | Determine if AWS IoT Thing already exists                                                                    |
+| `iot:CreateThing`              | from docs                                                                         | Write        | Create new AWS IoT Thing to represent Greengrass Core                                                        |
+| `iot:CreateKeysAndCertificate` | from docs                                                                         | Write        | Create and activate new X.509 client certificate and return certificate and private key                      |
+| `iot:DescribeCertificate`      | from docs                                                                         | Read         | Determine if AWS IoT Certificate already exists                                                              |
+| `iot:GetPolicy`                | from docs                                                                         | Read         | Determine if AWS IoT Policy already exists                                                                   |
+| `iot:CreatePolicy`             | from docs                                                                         | Write        | Create a new AWS IoT Policy with policy document containing `iot:AssumeRoleWithCertificate` Allow permission |
+| `iot:AttachPolicy`             | from docs                                                                         | Write        | Attach certificate to AWS IoT Policy                                                                         |
+| `iot:AttachThingPrincipal`     | from docs                                                                         | Write        | Attach certificate to AWS IoT Thing (Greengrass Core)                                                        |
+| `iot:ListPolicyVersions`       | from docs                                                                         | Read         | Determine if at limit (5) of AWS IoT Policy versions                                                         |
+| `iot:DeletePolicyVersion`      | from docs                                                                         | Write        | Delete the oldest AWS IoT Policy version to allow for new version                                            |
+| `iot:CreatePolicyVersion`      | from docs                                                                         | Write        | Create a new version of policy for an existing AWS IoT Policy                                                |
 
 # Coding, TODO's, etc.
 
@@ -43,7 +153,7 @@ The three approaches:
 1. Uses a bootstrap certificate and deployed Fleet Provisioning pipeline to complete the steps via Lambda.
 1. Uses a bootstrap certificate or API key to call API Gateway to completed the provisioning steps.
 
-**NOTE**: Provisioning only takes place on an installed, but not running Greengrass software deployment. It is expected to be part of an automation process such as Ansible, or GGv2 software embedded into a base install such as Yocto/OE.
+**NOTE**: Provisioning only takes place on an installed, but not running AWS IoT Greengrass software deployment. It is expected to be part of an automation process such as Ansible, or GGv2 software embedded into a base install such as Yocto/OE.
 
 Locally, a script would take in:
 
@@ -121,26 +231,27 @@ For artifact access, this needs to be added to role alias role:
 }
 ```
 
-The minimal created `config.yaml` will contain:
+The minimal created `config.yaml` will contain the following, with the `REPLACE_WITH_` text using the provisioned values:
 
 ```yaml
 ---
 system:
-  certificateFilePath: ""
-  privateKeyPath: ""
-  rootCaPath: ""
-  rootpath: "/greengrass/v2"
-  thingName: ""
+  certificateFilePath: "REPLACE_WITH_ABSOLUTE_PATH"
+  privateKeyPath: "REPLACE_WITH_ABSOLUTE_PATH"
+  rootCaPath: "REPLACE_WITH_ABSOLUTE_PATH"
+  rootpath: "REPLACE_WITH_ROOT_DIR"
+  thingName: "REPLACE_WITH_THING_NAME"
 services:
   aws.greengrass.Nucleus:
     componentType: "NUCLEUS"
     configuration:
-      awsRegion: "REGION"
+      awsRegion: "REPLACE_WITH_REGION"
       componentStoreMaxSizeBytes: 10000000000
       deploymentPollingFrequencySeconds: 15
       envStage: "prod"
-      iotCredEndpoint: ""
-      iotDataEndpoint: ""
+      iotCredEndpoint: "REPLACE_WITH_ENDPOINT"
+      iotDataEndpoint: "REPLACE_WITH_ENDPOINT"
+      iotRoleAlias: "REPLACE_WITH_ROLE_ALIAS"
 
       logging: {}
       networkProxy:
@@ -174,7 +285,7 @@ WantedBy=multi-user.target
 
 ## User stories
 
-1. I want to develop locally and create and configure Greengrass resources with local AWS credentials stored.
+1. I want to develop locally and create and configure AWS IoT Greengrass resources with local AWS credentials stored.
 1. I have a vanilla system that I will pass credentials to complete provisioning (SSM, Ansible) via a local provisioner.
 1. I have an embedded firmware with certificate and private key that I want to use to register a certificate (JITP) and configure Greengrass.
 1. I have a bootstrap certificate that I will use to register.

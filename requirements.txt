@@ -1,3 +1,4 @@
 tqdm
 colorlog
 boto3
+requests

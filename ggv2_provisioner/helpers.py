@@ -24,7 +24,10 @@ import botocore
 import boto3
 import argparse
 import json
+import inspect
+import requests
 from pathlib import Path
+from typing import Optional as Optional
 
 log = logging.getLogger("ggv2-provisioner")
 
@@ -59,6 +62,207 @@ def json_to_dict(filename: Path) -> dict:
     except Exception as e:
         log.error(f"{e}, invalid JSON in {filename}, exiting")
         sys.exit(1)
+
+
+def read_certificate_file(certificate_file: Path) -> str:
+    """Read the contents of the local X.509 certificate file and returns the string
+
+    :param certificate_file: X.509 client certificate to read
+    :type certificate_file: Path
+    :return: PEM encoded certificate
+    :rtype: str
+    """
+
+    # the certificate format is not modified
+    with open(certificate_file, "r") as f:
+        data = f.read()
+    return data
+
+
+def read_private_key_file(private_key_file: Path) -> str:
+    """Read the contents of the local private key file and then map to the same format
+        returned by the `CreateKeysAndCertificates` response
+
+    :param private_key_file: Private key file
+    :type private_key_file: Path
+    :return: PEM encoded private key, NOTE: the public key section is included but left blank.
+        The return should be mapped to an object named `keyPair`
+    :rtype: str
+
+    .. _CreateKeysAndCertificates: https://docs.aws.amazon.com/iot/latest/apireference/API_CreateKeysAndCertificate.html
+
+    """
+
+    # the certificate format is not modified
+    with open(private_key_file, "r") as f:
+        data = f.read()
+    return {"PublicKey": "", "PrivateKey": data}
+
+
+def write_ggv2_config(
+    provisioning_results: dict,
+    root_dir: str,
+    region_name: str,
+    iot_cred_endpoint: str,
+    iot_data_endpoint: str,
+):
+    """Creates the default `config.yaml` file used during first run of Greengrass
+    Nucleus
+
+    :param provisioning_results: Processed results of thing, role_alias, and other
+        details.
+    :type provisioning_results: dict
+    :param region_name: Region for Greengrass to connect and operate
+    :type region_name: str
+    :param iot_cred_endpoint: AWS IoT Credential Provider endpoint
+    :type iot_cred_endpoint: str
+    :param iot_data_endpoint: AWS IoT Core data endpoint
+    :type iot_data_endpoint: str
+    """
+
+    # Format the template placeholders. Other content can be added to this
+    # as needed, ensure proper YAML indentations. For empty indexes represented
+    # as braces such as foo: {}, use double braces in the template. For example:
+    # foo: {{}} will render to foo: {}
+    config_yaml_template = inspect.cleandoc(
+        """
+            ---
+            system:
+              certificateFilePath: "{certificate_file_path}"
+              privateKeyPath: "{private_key_path}"
+              rootCaPath: "{root_ca_path}"
+              rootpath: "{root_dir}"
+              thingName: "{thing_name}"
+            services:
+              aws.greengrass.Nucleus:
+                componentType: "NUCLEUS"
+                configuration:
+                  awsRegion: "{region}"
+                  componentStoreMaxSizeBytes: 10000000000
+                  deploymentPollingFrequencySeconds: 15
+                  envStage: "prod"
+                  iotCredEndpoint: "{iot_cred_endpoint}"
+                  iotDataEndpoint: "{iot_data_endpoint}"
+                  iotRoleAlias: "{iot_role_alias}"
+                  logging: {{}}
+                  networkProxy:
+                    proxy: {{}}
+                  runWithDefault:
+                    posixUser: "ggc_user:ggc_group"
+                version: "2.0.3"
+              main:
+                dependencies:
+                  - "aws.greengrass.Nucleus"
+                lifecycle: {{}}
+    """
+    ).format(
+        certificate_file_path=provisioning_results["credential_files"][
+            "certificate_file_name"
+        ],
+        private_key_path=provisioning_results["credential_files"][
+            "private_key_file_name"
+        ],
+        root_ca_path=provisioning_results["root_ca_file"]["root_ca_file_name"],
+        root_dir=root_dir,
+        thing_name=provisioning_results["iot_device"]["thingName"],
+        region=region_name,
+        iot_cred_endpoint=iot_cred_endpoint,
+        iot_data_endpoint=iot_data_endpoint,
+        iot_role_alias=provisioning_results["iot_role_alias"]["roleAlias"],
+    )
+
+    with open(Path() / root_dir / "config" / "config.yaml", "w") as f:
+        f.write(config_yaml_template)
+
+
+def write_root_ca(
+    root_dir: str, root_ca_file: Optional[str] = None, download_root_ca: bool = True
+) -> dict:
+    """Either downloads or writes an existing Amazon root CA file to the `root_dir` and returns the
+    filename and path under key of `root_ca_file`
+
+    :param root_dir: Location to write the CA file
+    :type root_dir: str
+    :param root_ca_file: Filename to read if `download_root_ca` is set to `False`
+    :type root_ca_file: str, optional
+    :param download_root_ca: Downloads the Amazon root CA if set True, defaults to True
+    :type download_root_ca: bool
+    :return: Full path of the root CA file as `credentials_files` object
+    :rtype: dict
+    """
+
+    root_ca_content = ""
+    if download_root_ca:
+        root_ca_content = requests.get(
+            "https://www.amazontrust.com/repository/AmazonRootCA1.pem"
+        ).text
+    else:
+        try:
+            with open(Path(root_ca_file), "r") as f:
+                root_ca_content = f.read()
+        except Exception as e:
+            log.error(f"{e}, could not read --root-ca-file content")
+
+    # Write the file out!
+    root_ca_file_name = Path() / root_dir / "RootCA.pem"
+    with open(root_ca_file_name, "w") as f:
+        f.write(root_ca_content)
+
+    return {"root_ca_file": {"root_ca_file_name": str(root_ca_file_name)}}
+
+
+def write_credential_files(
+    root_dir: Path,
+    certificate_file: str,
+    private_key_file: str,
+    certificate_file_name: Optional[Path] = None,
+    private_key_file_name: Optional[Path] = None,
+) -> dict:
+    """Write the credential files to $GG_ROOT directory and return the name used.
+
+    :param root_dir: Directory to save credential files
+    :type root_dir: (Path)
+    :param certificate_file: Certificate contents to save
+    :type certificate_file: str
+    :param private_key_file: Private key contents to save
+    :type private_key_file: str
+    :param certificate_file_name: Filename and path for saving `certificate_file` contents
+    :type certificate_file_name: (Path), optional
+    :param private_key_file_name: Filename and path for saving `private_ky_file` contents
+    :type private_key_file_name: (Path), optional
+    :return: Full path of credential and certificate filenames as `credential_files` object
+    :rtype: dict of (Path)
+    """
+
+    if certificate_file_name is None:
+        # TODO - make the filename from the certificate CN/hash
+        certificate_file_name = Path() / root_dir / "ThingName-certificate.pem"
+    else:
+        # Use the filename provided
+        certificate_file_name = Path() / root_dir / certificate_file.name
+
+    if private_key_file_name is None:
+        # TODO - make the filename from the certificate CN/hash
+        private_key_file_name = Path() / root_dir / "ThingName-private-key.pem"
+    else:
+        # Use the filename provided
+        private_key_file_name = Path() / root_dir / private_key_file_name.name
+
+    # Write the the files
+    with open(certificate_file_name, "w") as f:
+        f.write(certificate_file)
+    log.info(f"wrote certificate file contents to {str(certificate_file_name)}")
+
+    with open(private_key_file_name, "w") as f:
+        f.write(private_key_file)
+    log.info(f"wrote private key file contents to {str(private_key_file_name)}")
+
+    return {
+        "credential_files": {
+            "certificate_file_name": str(certificate_file_name),
+            "private_key_file_name": str(private_key_file_name),
+        }
+    }
 
 
 def verify_greengrass(gg_root: Path) -> bool:
@@ -260,6 +464,8 @@ def provision_iot_thing(
     region_name: str,
     thing_name: str,
     certificate_id: str,
+    certificate_file: str,
+    private_key_file: str,
     iot_policy_name: str,
     iot_policy_file: Path,
     iot_role_alias_name,
@@ -275,6 +481,12 @@ def provision_iot_thing(
         If not provided and a thing is created, a new certificate will be created
         and the private key and certificate returned
     :type certificate_id: str, optional
+    :param certificate_file: Qualified local file that contains the X.509 client
+        certificate if `certificate_id` was provided
+    :type certificate_file: pathlib.Path, optional
+    :param private_key_file: Qualified local file that contains the X.509 client
+        certificate's private key, if `certificate_id` was provided
+    :type private_key_file: pathlib.Path, optional
     :param iot_policy_name: Name of IoT policy to reference, will be
         attached to the certificate. If not provided or doesn't exist,
         `iot_policy_file` must be provided
@@ -332,7 +544,7 @@ def provision_iot_thing(
             # Validate if certificate Id is valid and exists
             response = iot_client.describe_certificate(certificateId=certificate_id)
             log.info(
-                f'Created certificate: {response["certificateDescription"]["certificateId"]}'
+                f'Validated certificate: {response["certificateDescription"]["certificateId"]}'
             )
             iot_device["iot_device"]["certificateId"] = response[
                 "certificateDescription"
@@ -340,6 +552,12 @@ def provision_iot_thing(
             iot_device["iot_device"]["certificateArn"] = response[
                 "certificateDescription"
             ]["certificateArn"]
+            iot_device["iot_device"]["certificatePem"] = read_certificate_file(
+                certificate_file
+            )
+            iot_device["iot_device"]["keyPair"] = read_private_key_file(
+                private_key_file
+            )
         except botocore.exceptions.ClientError as e:
             log.error(
                 f"{e} when attempting to describe certificate: {certificate_id}, exiting"
@@ -378,6 +596,7 @@ def provision_iot_thing(
                 iot_role_alias_name=iot_role_alias_name,
                 region_name=region_name,
             )
+        log.info(f"AWS IoT Policy {iot_policy_name} already exists")
         iot_device["iot_device"]["policyName"] = response["policyName"]
         iot_device["iot_device"]["policyArn"] = response["policyArn"]
     except iot_client.exceptions.ResourceNotFoundException:
@@ -390,16 +609,20 @@ def provision_iot_thing(
         try:
             with open(iot_policy_file, "r") as f:
                 policy_document = f.read()
+            response = iot_client.create_policy(
+                policyName=iot_policy_name, policyDocument=policy_document
+            )
             if not verify_alias_in_policy(
                 policy_document=policy_document, iot_role_alias_name=iot_role_alias_name
             ):
-                # TODO - add assumerolewithcertificate statement if it doesn't exist
-                log.error(
-                    f'content of --iot-policy-file must contain a valid "iot:AssumeRoleWithCertificate" statement referencing a valid AWS IoT Role Alias'
+                # Need to add alias to existing policy
+                add_role_alias_to_policy(
+                    iot_policy_name=iot_policy_name,
+                    iot_role_alias_name=iot_role_alias_name,
+                    region_name=region_name,
                 )
-                sys.exit(1)
-            response = iot_client.create_policy(
-                policyName=iot_policy_name, policyDocument=policy_document
+            log.info(
+                f"created AWS IoT Policy {iot_policy_name} and added iot:AssumeRoleWithCertificate action for AWS IoT Role Alias {iot_role_alias_name}"
             )
             iot_device["iot_device"]["policyName"] = response["policyName"]
             iot_device["iot_device"]["policyArn"] = response["policyArn"]
@@ -413,6 +636,36 @@ def provision_iot_thing(
             exit(1)
 
     # Thing, certificate, and policy validated, complete attachment of principal to thing and policy
+
+    # attach certificate to policy
+    try:
+        response = iot_client.attach_policy(
+            policyName=iot_device["iot_device"]["policyName"],
+            target=iot_device["iot_device"]["certificateArn"],
+        )
+        log.info(
+            f'successfully attached certificate {iot_device["iot_device"]["certificateArn"]} to policy {iot_device["iot_device"]["policyName"]}'
+        )
+    except botocore.exceptions.ClientError as e:
+        log.error(
+            f"{e} while attaching certificate to AWS IoT Policy, exiting. Resources have not been rolled back"
+        )
+        sys.exit(1)
+    # Attach certificate to thing
+    try:
+        response = iot_client.attach_thing_principal(
+            thingName=iot_device["iot_device"]["thingName"],
+            principal=iot_device["iot_device"]["certificateArn"],
+        )
+        log.info(
+            f'successfully attached certificate {iot_device["iot_device"]["certificateId"]} to AWS IoT thing  {iot_device["iot_device"]["thingName"]}'
+        )
+    except botocore.exceptions.ClientError as e:
+        log.error(
+            f"{e} while attaching certificate to AWS IoT THing, exiting. Resources have not been rolled back"
+        )
+        sys.exit(1)
+
     return iot_device
 
 
@@ -434,26 +687,34 @@ def add_role_alias_to_policy(
     try:
         iot_client = boto3.client("iot", region_name=region_name)
         response = iot_client.get_policy(policyName=iot_policy_name)
+
+        # From the active version of the policy, get the account and load
+        # policy statement array
         account = response["policyArn"].split(":")[4]
+        policy_document = json.loads(response["policyDocument"])
         role_alias_statement = {
             "Effect": "Allow",
             "Action": "iot:AssumeRoleWithCertificate",
             "Resource": f"arn:aws:iot:{region_name}:{account}:rolealias/{iot_role_alias_name}",
         }
-        new_policy = response["Statement"].append(role_alias_statement)
+        # Update the policy document dict with the needed Role Alias statement
+        policy_document["Statement"].append(role_alias_statement)
         # Determine if a new version can be created
         response = iot_client.list_policy_versions(policyName=iot_policy_name)
         if len(response["policyVersions"]) == 5:
             # delete the oldest version
-            iot_client.delete_policy_version(
+            r = iot_client.delete_policy_version(
                 policyName=iot_policy_name,
                 policyVersionId=response["policyVersions"][-1]["versionId"],
             )
         response = iot_client.create_policy_version(
             policyName=iot_policy_name,
-            policyDocument=json.dumps(new_policy),
+            policyDocument=json.dumps(policy_document),
             setAsDefault=True,
         )
+    except botocore.exceptions.ClientError as e:
+        log.error(f"{e}, uncaught")
+        sys.exit(1)
     except Exception as e:
         log.error(f"{e}, uncaught")
         sys.exit(1)
@@ -472,12 +733,17 @@ def verify_alias_in_policy(policy_document: str, iot_role_alias_name: str) -> bo
 
     try:
         data = json.loads(policy_document)
+        log.debug(f"verify data dict is: {data}")
     except json.decoder.JSONDecodeError as e:
         log.error(f"AWS IoT Policy is invalid JSON")
         return False
 
     # Check for any action that might match
     for statement in data["Statement"]:
+        # Statements can contain a list of Actions or a single Action as a string
+        if type(statement["Action"]) is str:
+            # Single action, create a single entry list
+            statement["Action"] = [statement["Action"]]
         for action in statement["Action"]:
             # Check each action for matching actions: iot:*, iot:Assume*, ...
             if re.fullmatch(action.replace("*", ".*"), "iot:AssumeRoleWithCertificate"):
@@ -514,7 +780,8 @@ def provision_greengrass(arguments: argparse) -> dict:
 
     provisioning_results = {}
 
-    # Create or use IoT Role Alias and update results (key = iot_role_alias)
+    # Create or use IoT Role Alias and update results
+    # (key = iot_role_alias)
     response = provision_iot_role_alias(
         region_name=region_name,
         iot_role_alias_name=arguments.iot_role_alias_name,
@@ -522,6 +789,9 @@ def provision_greengrass(arguments: argparse) -> dict:
         iam_policy_file=arguments.iam_policy_file,
     )
     provisioning_results.update(response)
+    log.debug(
+        f"provisioning results after role alias: {json.dumps(provisioning_results)}"
+    )
 
     # Create or use Thing, Certificate and IoT Policy resource, then update results
     # (key = iot_device)
@@ -530,7 +800,48 @@ def provision_greengrass(arguments: argparse) -> dict:
         thing_name=arguments.thing_name,
         iot_role_alias_name=arguments.iot_role_alias_name,
         certificate_id=arguments.certificate_id,
+        certificate_file=arguments.certificate_file,
+        private_key_file=arguments.private_key_file,
         iot_policy_name=arguments.iot_policy_name,
         iot_policy_file=arguments.iot_policy_file,
     )
     provisioning_results.update(response)
+    log.debug(
+        f"provisioning results after iot thing: {json.dumps(provisioning_results)}"
+    )
+
+    # With all cloud resources created, save or copy credentials to GG_ROOT and create
+    # the $GG_ROOT/config/config.yaml file
+
+    # Write the certificate and private key
+    # ( key = filenames)
+    response = write_credential_files(
+        root_dir=arguments.root_dir,
+        certificate_file=provisioning_results["iot_device"]["certificatePem"],
+        private_key_file=provisioning_results["iot_device"]["keyPair"]["PrivateKey"],
+    )
+    provisioning_results.update(response)
+    # Download and write rootCA
+    if arguments.download_root_ca:
+        response = write_root_ca(
+            root_dir=arguments.root_dir,
+            download_root_ca=True,
+        )
+    else:
+        response = write_root_ca(
+            root_dir=arguments.root_dir,
+            root_ca_file=arguments.root_ca_file,
+            download_root_ca=False,
+        )
+    provisioning_results.update(response)
+
+    # Write config.yaml
+    write_ggv2_config(
+        provisioning_results=provisioning_results,
+        region_name=region_name,
+        root_dir=arguments.root_dir,
+        iot_cred_endpoint=arguments.iot_cred_endpoint,
+        iot_data_endpoint=arguments.iot_data_endpoint,
+    )
+
+    return provisioning_results
