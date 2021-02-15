@@ -758,7 +758,7 @@ def verify_alias_in_policy(policy_document: str, iot_role_alias_name: str) -> bo
                         return True
 
     # No matching statements found
-    log.error(
+    log.warning(
         f"No statement for iot:AssumeRoleWithCertificate and resource {iot_role_alias_name} found in AWS IoT Policy: {policy_document}"
     )
     return False
@@ -867,14 +867,14 @@ def provision_greengrass(arguments: argparse) -> dict:
         iot_cred_endpoint = arguments.iot_cred_endpoint
     else:
         iot_cred_endpoint = get_endpoint(
-            region=region_name, endpoint_type="iot:CredentialProvider"
+            region_name=region_name, endpoint_type="iot:CredentialProvider"
         )
 
     if arguments.iot_data_endpoint is not None:
         iot_data_endpoint = arguments.iot_data_endpoint
     else:
         iot_data_endpoint = get_endpoint(
-            region=region_name, endpoint_type="iot:Data-ATS"
+            region_name=region_name, endpoint_type="iot:Data-ATS"
         )
 
     # Write config.yaml

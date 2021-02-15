@@ -24,7 +24,7 @@ The ggv2-provisioner is supported on Python 3.6 and above.
 
 Prior to running the _Provisioner_, first install that AWS IoT Greengrass is installed but not configured or installed.
 
-Follow the [Setting up AWS IoT Greengrass Version 2](https://docs.aws.amazon.com/greengrass/v2/developerguide/setting-up.html) to verify all dependencies are installed, and next complete the [Install the AWS IoT Greengrass Core software](https://docs.aws.amazon.com/greengrass/v2/developerguide/install-greengrass-core-v2.html) steps 1 through 3, then **STOP** (_do not perform step 4_).
+Follow the [Setting up AWS IoT Greengrass Version 2](https://docs.aws.amazon.com/greengrass/v2/developerguide/setting-up.html) to verify all dependencies are installed, and next complete the [Install the AWS IoT Greengrass Core software](https://docs.aws.amazon.com/greengrass/v2/developerguide/install-greengrass-core-v2.html) steps 1 through 3 (exporting AWS credentials), then **STOP** (_do not perform step 4_).
 
 From the directory where you unzipped the AWS IoT Greengrass distribution, run the following command to install the AWS IoT Greengrass Core software into the `root` directory (change as needed):
 
@@ -66,9 +66,10 @@ Note: The command line below references sample IAM and IoT policy documents loca
 ```shell
 # Run from the ggv2_provisioner directory
 # Replace all "Test-" values with what you want to call the resources
-sudo ggv2-provisioner \
+cd ~/greengrassv2-provisioner
+sudo python3 -m ggv2_provisioner \
   --root-dir /greengrass/v2 \
-  --region $GG_REGION \
+  --region YOUR_REGION \
   --thing-name "Test-gg-device" \
   --download-root-ca \
   --iot-role-alias-name "Test-gg-role-alias" \

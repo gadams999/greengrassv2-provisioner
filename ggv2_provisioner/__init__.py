@@ -1,12 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-"""Provision and configure local Greengrass v2 installation with Cloud resources.
-
-Usage:
-    ./ggv2_provisioner.py --help
-
-Author:
+"""
     Amazon.com, Inc.
 
 License:
@@ -22,76 +14,5 @@ License:
     License for the specific language governing permissions and limitations under the License.
 """
 
-import logging
-import json
-import sys
-from pathlib import Path
-
-import tqdm
-import colorlog
-
 from .provisioner_argparse import *
 from .helpers import *
-
-
-class TqdmLoggingHandler(logging.Handler):
-    def __init__(self, level=logging.NOTSET):
-        super().__init__(level)
-
-    def emit(self, record):
-        try:
-            msg = self.format(record)
-            tqdm.tqdm.write(msg)
-            self.flush()
-        except (KeyboardInterrupt, SystemExit):
-            raise
-        except:
-            self.handleError(record)
-
-
-log = logging.getLogger("ggv2-provisioner")
-log.setLevel(logging.INFO)
-handler = TqdmLoggingHandler()
-handler.setFormatter(
-    colorlog.ColoredFormatter(
-        "%(log_color)s%(name)s | %(asctime)s | %(levelname)s | %(message)s",
-        datefmt="%Y-%d-%d %H:%M:%S",
-        log_colors={
-            "DEBUG": "cyan",
-            "INFO": "white",
-            "SUCCESS:": "green",
-            "WARNING": "yellow",
-            "ERROR": "red",
-            "CRITICAL": "red,bg_white",
-        },
-    )
-)
-log.addHandler(handler)
-
-
-def main():
-
-    # Process arguments
-    arguments = provisioner_argparse.parse_arguments()
-    log.debug(f"command arguments: {arguments}")
-
-    # Verify that Greengrass exists and is pristine
-    print("Verifying Greengrass is installed and in unmodified state")
-    if not helpers.verify_greengrass(arguments.root_dir):
-        sys.exit(1)
-
-    # Verify that AWS credentials are available for use
-    print("Verifying AWS credentials are available for use")
-    if not helpers.verify_aws_credentials(arguments.region):
-        sys.exit(1)
-
-    # Start provisioning process - Builds a dictionary of results to then use to process a
-    # new config.yaml file, populate files, or return a singular object for light-weight app
-    # to process.
-
-    response = helpers.provision_greengrass(arguments)
-    print(json.dumps(response))
-
-
-if __name__ == "__main__":
-    main()
