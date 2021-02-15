@@ -196,13 +196,13 @@ def parse_arguments():
     )
     requiredGroup.add_argument(
         "--iot-data-endpoint",
-        required=True,
+        required=False,
         type=is_fqdn,
         help="the AWS IoT data endpoint for your AWS account",
     )
     requiredGroup.add_argument(
         "--iot-cred-endpoint",
-        required=True,
+        required=False,
         type=is_fqdn,
         help="the AWS IoT credentials endpoint for your account",
     )

@@ -6,13 +6,17 @@ Once completed, the initial start of AWS IoT Greengrass will read the contents o
 
 ## Installation
 
-You can install the _Provisioner_ from [PyPI](link_goes_here):
+Clone the repository and install dependencies
 
 ```shell
-pip install ggv2-provisioner
+cd ~
+git clone https://github.com/gadams999/greengrassv2-provisioner.git
+cd greengrassv2-provisioner
 ```
 
-The reader is supported on Python 3.6 and above.
+The ggv2-provisioner is supported on Python 3.6 and above.
+
+> :warning: **You will need to run `ggv2_provisioner` as root (sudo)** - the installation above will place required packages into the root users' directory.
 
 ## How to use
 
@@ -20,9 +24,9 @@ The reader is supported on Python 3.6 and above.
 
 Prior to running the _Provisioner_, first install that AWS IoT Greengrass is installed but not configured or installed.
 
-Follow the [Setting up AWS IoT Greengrass Version 2](https://docs.aws.amazon.com/greengrass/v2/developerguide/setting-up.html) to verify all dependencies are installed, and next complete the [Install the AWS IoT Greengrass Core software](https://docs.aws.amazon.com/greengrass/v2/developerguide/install-greengrass-core-v2.html) steps 1 and 2, then **STOP** (_do not perform step 3_).
+Follow the [Setting up AWS IoT Greengrass Version 2](https://docs.aws.amazon.com/greengrass/v2/developerguide/setting-up.html) to verify all dependencies are installed, and next complete the [Install the AWS IoT Greengrass Core software](https://docs.aws.amazon.com/greengrass/v2/developerguide/install-greengrass-core-v2.html) steps 1 through 3, then **STOP** (_do not perform step 4_).
 
-From the directy where you unzipped the AWS IoT Greengrass distribution, run the following command to install the AWS IoT Greengrass Core software into the `root` dirctory (change as needed):
+From the directory where you unzipped the AWS IoT Greengrass distribution, run the following command to install the AWS IoT Greengrass Core software into the `root` directory (change as needed):
 
 ```shell
 sudo -E java -Droot="/greengrass/v2" -Dlog.store=FILE \
@@ -55,36 +59,26 @@ If you need to deploy all the required resources to run AWS IoT Greengrass, use 
   - AWS IoT Policy used by the AWS IoT Greengrass Core to interact with `iot` and `greengrass` actions
   - Attach the Certificate to the Thing and Policy
 
-As the configuration requires unique values from your account, use the AWS CLI to obtain the following values:
-
-```shell
-export GG_REGION=<you-aws-region>
-export IOT_CREDENTIAL_ENDPOINT=$(aws iot --region $GG_REGION describe-endpoint --endpoint-type iot:CredentialProvider --query 'endpointAddress' --output text)
-export IOT_DATA_ENDPOINT=$(aws iot --region $GG_REGION describe-endpoint --endpoint-type iot:Data-ATS --query 'endpointAddress' --output text)
-```
-
-Next, run the _Provisioner_ command to complete the operations.
+Run the _Provisioner_ command to complete the operations.
 
 Note: The command line below references sample IAM and IoT policy documents located in the `samples/` directory. Please review and change the actions and resources as needed. Also, you will need, at minimum, the local AWS permissions listed in the **FAQ Permissions** section.
 
 ```shell
 # Run from the ggv2_provisioner directory
 # Replace all "Test-" values with what you want to call the resources
-./ggv2_provisioner.py \
+sudo ggv2-provisioner \
   --root-dir /greengrass/v2 \
   --region $GG_REGION \
   --thing-name "Test-gg-device" \
   --download-root-ca \
   --iot-role-alias-name "Test-gg-role-alias" \
   --iam-role-name "Test-gg-role" \
-  --iam-policy-file ./iam_base_permissions.json \
+  --iam-policy-file samples/iam_base_permissions.json \
   --iot-policy-name "Test-iot-policy" \
-  --iot-policy-file ./iot_base_permissions.json \
-  --iot-data-endpoint $IOT_DATA_ENDPOINT \
-  --iot-cred-endpoint $IOT_CREDENTIAL_ENDPOINT
+  --iot-policy-file samples/iot_base_permissions.json
 ```
 
-This will complete _all_ operations needed for a new AWS IoT Greengrass Core to operate.
+This will complete _all_ the operations needed for a new AWS IoT Greengrass Core to be provisioned in the cloud and configured locally.
 
 ### Option 2 - Provision a Thing with an Existing IoT Role Alias
 
@@ -121,7 +115,7 @@ The _Provisioner_ is prescriptive in certain approaches to the provisioning proc
 
 ### What are the minimum permissions required to run the Provisioner?
 
-These are the [IAM Actions](https://docs.aws.amazon.com/service-authorization/latest/reference/reference_policies_actions-resources-contextkeys.html) required to run all steps of the _Provisioner_. If some operations are not being performed, such as the creation of an IAM Role, those can removed from the minimum.
+These are the [IAM Actions](https://docs.aws.amazon.com/service-authorization/latest/reference/reference_policies_actions-resources-contextkeys.html) required to run all steps of the _Provisioner_. If some operations are not being performed, such as the creation of an IAM Role, those can removed from any minimum permissions. Due to the variability of naming, `Resource` values should be set to `"*"` unless you will scope down naming conventions.
 
 | Action                         | Description                                                                       | Access Level | Provisioner Use                                                                                              |
 | ------------------------------ | --------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------ |

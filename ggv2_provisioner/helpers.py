@@ -764,6 +764,32 @@ def verify_alias_in_policy(policy_document: str, iot_role_alias_name: str) -> bo
     return False
 
 
+def get_endpoint(region_name: str, endpoint_type: str) -> str:
+    """Query and return the specific endpoint
+
+    :param region_name: Region to obtain the endpoint
+    :type region_name: str
+    :param endpoint_type: Endpoint type to query
+    :type endpoint_type: str
+    :return: The FQDN of the endpoint
+    :rtype: str
+    """
+
+    iot_client = boto3.client("iot", region_name=region_name)
+    try:
+        response = iot_client.describe_endpoint(endpointType=endpoint_type)
+        log.info(
+            f"Endpoint for type: {endpoint_type} is: {response['endpointAddress']}"
+        )
+        return response["endpointAddress"]
+    except botocore.exceptions.ClientError as e:
+        log.error(
+            f"Invalid response {e} when attempting to describe endpoint type of {endpoint_type}"
+        )
+        sys.exit(1)
+    return response
+
+
 def provision_greengrass(arguments: argparse) -> dict:
     """Orchstrates and completes all provisioning processes based on
     incoming validated argument list
@@ -835,13 +861,29 @@ def provision_greengrass(arguments: argparse) -> dict:
         )
     provisioning_results.update(response)
 
+    # If data and credential endpoints were not provided, obtain
+
+    if arguments.iot_cred_endpoint is not None:
+        iot_cred_endpoint = arguments.iot_cred_endpoint
+    else:
+        iot_cred_endpoint = get_endpoint(
+            region=region_name, endpoint_type="iot:CredentialProvider"
+        )
+
+    if arguments.iot_data_endpoint is not None:
+        iot_data_endpoint = arguments.iot_data_endpoint
+    else:
+        iot_data_endpoint = get_endpoint(
+            region=region_name, endpoint_type="iot:Data-ATS"
+        )
+
     # Write config.yaml
     write_ggv2_config(
         provisioning_results=provisioning_results,
         region_name=region_name,
         root_dir=arguments.root_dir,
-        iot_cred_endpoint=arguments.iot_cred_endpoint,
-        iot_data_endpoint=arguments.iot_data_endpoint,
+        iot_cred_endpoint=iot_cred_endpoint,
+        iot_data_endpoint=iot_data_endpoint,
     )
 
     return provisioning_results
