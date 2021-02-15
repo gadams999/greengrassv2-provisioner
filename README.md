@@ -67,7 +67,7 @@ Note: The command line below references sample IAM and IoT policy documents loca
 # Run from the ggv2_provisioner directory
 # Replace all "Test-" values with what you want to call the resources
 cd ~/greengrassv2-provisioner
-sudo python3 -m ggv2_provisioner \
+sudo -E python3 -m ggv2_provisioner \
   --root-dir /greengrass/v2 \
   --region YOUR_REGION \
   --thing-name "Test-gg-device" \
