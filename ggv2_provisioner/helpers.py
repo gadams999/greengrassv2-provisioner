@@ -874,7 +874,7 @@ def install_greengrass(gg_install_media_dir: str, root_dir: str) -> bool:
         "--setup-system-service",
         "true",
         "--init-config",
-        Path(tempfile.gettempdir(), "config.yaml"),
+        f'{Path(tempfile.gettempdir(), "config.yaml")}',
     ]
     try:
         subprocess.run(args=args, shell=False, check=True)
