@@ -95,7 +95,13 @@ def set_debug(level: str) -> str:
 
 def parse_arguments():
     """Parse and validate argument list required for provisioner"""
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        prog="ggv2_provisioner",
+        description="""Provisions new AWS IoT Greengrass 2 installation,
+            to create or reference AWS IoT resources.
+        """,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
 
     # Optional arguments
     parser.add_argument(
@@ -203,13 +209,13 @@ def parse_arguments():
         "--iot-data-endpoint",
         required=False,
         type=is_fqdn,
-        help="the AWS IoT data endpoint for your AWS account",
+        help="non-default AWS IoT data endpoint for your AWS account",
     )
     parser.add_argument(
         "--iot-cred-endpoint",
         required=False,
         type=is_fqdn,
-        help="the AWS IoT credentials endpoint for your account",
+        help="non-default AWS IoT credentials endpoint for your account",
     )
 
     # Perform general argument processing
