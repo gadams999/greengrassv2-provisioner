@@ -876,6 +876,7 @@ def install_greengrass(gg_install_media_dir: str, root_dir: str) -> bool:
         "--init-config",
         f'{Path(tempfile.gettempdir(), "config.yaml")}',
     ]
+    log.debug(f"Fully expanded install command line is: {args}")
     try:
         subprocess.run(args=args, shell=False, check=True)
         return True
