@@ -6,12 +6,13 @@ Once completed, the initial start of AWS IoT Greengrass will read the contents o
 
 ## Installation
 
-Clone the repository and install dependencies
+Clone the repository and install dependencies. As the provisioner is normally only needed for single operations, once the repository is cloned, install the package dependencies under the default user which will be used with the `sudo -E` install command.
 
 ```shell
 cd ~
 git clone https://github.com/gadams999/greengrassv2-provisioner.git
 cd greengrassv2-provisioner
+pip3 install --user -r requirements.txt
 ```
 
 The ggv2-provisioner is supported on Python 3.6 and above.
