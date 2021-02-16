@@ -74,9 +74,15 @@ def main():
     arguments = provisioner_argparse.parse_arguments()
     log.debug(f"command arguments: {arguments}")
 
-    # Verify that Greengrass exists and is pristine
-    print("Verifying Greengrass is installed and in unmodified state")
-    if not helpers.verify_greengrass(arguments.root_dir):
+    # TODO - remove once new process of provisioner -> config.yaml -> install script runs
+    # Verify that Greengrass installation media exists
+    print("Verifying Greengrass installation media")
+    if not helpers.verify_greengrass_install_media(arguments.gg_install_media_dir):
+        sys.exit(1)
+
+    # Verify that the root directory for Greengrass does not exist
+    print(f"Verifying {arguments.root_dir} does not exist or is empty")
+    if not helpers.verify_target_directory_empty(arguments.root_dir):
         sys.exit(1)
 
     # Verify that AWS credentials are available for use
@@ -88,8 +94,14 @@ def main():
     # new config.yaml file, populate files, or return a singular object for light-weight app
     # to process.
 
+    print("Starting the Cloud provisioning process")
     response = helpers.provision_greengrass(arguments)
     print(json.dumps(response))
+
+    # with files save locally, run the GG installation process
+    response = helpers.install_greengrass(
+        arguments.gg_install_media_dir, arguments.root_dir
+    )
 
 
 if __name__ == "__main__":

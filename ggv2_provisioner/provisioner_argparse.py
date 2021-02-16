@@ -115,6 +115,11 @@ def parse_arguments():
         default=Path("/greengrass/v2"),
     )
     requiredGroup.add_argument(
+        "--gg-install-media-dir",
+        required=True,
+        help="directory with the unzipped Greengrass installation files",
+    )
+    requiredGroup.add_argument(
         "--component-default-user",
         help="default user:group for running components",
         default="ggc_user:ggc_group",
@@ -194,13 +199,13 @@ def parse_arguments():
         type=is_aws_region,
         help='region for Greengrass to provision and connect (e.g., "us-west-2")',
     )
-    requiredGroup.add_argument(
+    parser.add_argument(
         "--iot-data-endpoint",
         required=False,
         type=is_fqdn,
         help="the AWS IoT data endpoint for your AWS account",
     )
-    requiredGroup.add_argument(
+    parser.add_argument(
         "--iot-cred-endpoint",
         required=False,
         type=is_fqdn,

@@ -25,6 +25,11 @@ import boto3
 import argparse
 import json
 import inspect
+import zipfile
+import tempfile
+import subprocess
+import shutil
+
 import requests
 from pathlib import Path
 from typing import Optional as Optional
@@ -112,6 +117,8 @@ def write_ggv2_config(
     :param provisioning_results: Processed results of thing, role_alias, and other
         details.
     :type provisioning_results: dict
+    :param root_dir: Root directory where Greengrass is installed
+    :type root_dir: str
     :param region_name: Region for Greengrass to connect and operate
     :type region_name: str
     :param iot_cred_endpoint: AWS IoT Credential Provider endpoint
@@ -171,7 +178,9 @@ def write_ggv2_config(
         iot_role_alias=provisioning_results["iot_role_alias"]["roleAlias"],
     )
 
-    with open(Path() / root_dir / "config" / "config.yaml", "w") as f:
+    # Save the config.yaml file to temporary directory
+
+    with open(Path(tempfile.gettempdir(), "config.yaml"), "w") as f:
         f.write(config_yaml_template)
 
 
@@ -263,6 +272,53 @@ def write_credential_files(
             "private_key_file_name": str(private_key_file_name),
         }
     }
+
+
+def verify_greengrass_install_media(root_dir: Path) -> bool:
+    """Verifies that the unzipped Greengrass files are available to run the
+        installation script. Also verifies that java is on the path.
+    :param root_dir: Root directory where the `bin`, `conf`, and `lib` directories are located,
+        verify that `lib/Greengrass.jar` is there.
+    :type root_dir: Path
+    :return: True if installation media is available, otherwise False
+    :rtype: bool
+    """
+
+    log.info("Checking for unzipped Greengrass installation media")
+    if zipfile.is_zipfile(Path(root_dir, "lib", "Greengrass.jar").expanduser()):
+        log.info("installation media found")
+    else:
+        log.error(
+            f"installation file {str(Path(root_dir, 'lib', 'Greengrass.jar').expanduser())} not found, exiting"
+        )
+        return False
+
+    # Verify other dependencies needed to install Greengrass
+    if shutil.which("java") is None:
+        log.error("java executable not found on path, exiting")
+        return False
+
+    # All dependencies passed
+    return True
+
+
+def verify_target_directory_empty(root_dir: Path) -> bool:
+    """Reviews target installation directory to make sure it doesn't exist or is empty. The
+        Greengrass installation process with create or populate the directory.
+
+    :param root_dir: Target Greengrass installlation directory
+    :type root_dir: Path
+    :return: True if directory is empty or does not exist
+    :rtype: bool
+    """
+
+    if Path(root_dir).is_dir():
+        # Directory exists, ensure it's empty
+        if any(Path(root_dir).iterdir()):
+            log.error(f"target installation directory {root_dir} is not empty, exiting")
+            return False
+
+    return True
 
 
 def verify_greengrass(gg_root: Path) -> bool:
@@ -790,15 +846,51 @@ def get_endpoint(region_name: str, endpoint_type: str) -> str:
     return response
 
 
+def install_greengrass(gg_install_media_dir: str, root_dir: str) -> bool:
+    """Runs the Greengrass installation process with a prescriptive set of flags
+
+
+    :param gg_install_media_dir: Root of where the `lib/Greengrass.jar` file is located.
+        NOTE: After installation this directory must not be deleted.
+    :type gg_install_media_dir: str
+    :param root_dir: Root directory to install Greengrass
+    :type root_dir: str
+    :return: True if installation operation was successful, otherwise will exit with an error
+    :rtype: bool
+    """
+
+    args = [
+        "java",
+        f'-Droot="{str(root_dir)}"',
+        "-Dlog.store=FILE",
+        "-jar",
+        f'{Path(gg_install_media_dir, "lib", "Greengrass.jar")}',
+        "--component-default-user",
+        "ggc_user:ggc_group",
+        "--provision",
+        "false",
+        "--start",
+        "false",
+        "--setup-system-service",
+        "true",
+        "--init-config",
+        Path(tempfile.gettempdir(), "config.yaml"),
+    ]
+    try:
+        subprocess.run(args=args, shell=False, check=True)
+        return True
+    except Exception as e:
+        log.error(e)
+
+
 def provision_greengrass(arguments: argparse) -> dict:
     """Orchstrates and completes all provisioning processes based on
-    incoming validated argument list
+        incoming validated argument list
 
-    Args:
-        arguments (argparse): validated arguments
-
-    Returns:
-        dict: all status and values from provisioning steps
+    :param arguments: Validated command line arguments
+    :type arguments: argparse
+    :return: Results from provisioning steps
+    :rtype: dict
     """
 
     # define commonly used values
@@ -836,10 +928,15 @@ def provision_greengrass(arguments: argparse) -> dict:
         f"provisioning results after iot thing: {json.dumps(provisioning_results)}"
     )
 
-    # With all cloud resources created, save or copy credentials to GG_ROOT and create
-    # the $GG_ROOT/config/config.yaml file
+    # With all cloud resources created, save or copy credentials to $GG_ROOT
 
-    # Write the certificate and private key
+    # Create $GG_ROOT
+    try:
+        os.makedirs(Path(arguments.root_dir).expanduser())
+    except Exception as e:
+        log.error(e)
+
+    # Write the certificate and private key to $GG_ROOT
     # ( key = filenames)
     response = write_credential_files(
         root_dir=arguments.root_dir,
@@ -877,7 +974,7 @@ def provision_greengrass(arguments: argparse) -> dict:
             region_name=region_name, endpoint_type="iot:Data-ATS"
         )
 
-    # Write config.yaml
+    # Generate and write config.yaml to temporary directory
     write_ggv2_config(
         provisioning_results=provisioning_results,
         region_name=region_name,
@@ -885,5 +982,7 @@ def provision_greengrass(arguments: argparse) -> dict:
         iot_cred_endpoint=iot_cred_endpoint,
         iot_data_endpoint=iot_data_endpoint,
     )
+
+    # Call Greengrass install process
 
     return provisioning_results

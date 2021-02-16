@@ -33,7 +33,9 @@ sudo -E java -Droot="/greengrass/v2" -Dlog.store=FILE \
   -jar ./GreengrassCore/lib/Greengrass.jar \
   --component-default-user ggc_user:ggc_group \
   --provision false \
-  --start false
+  --start false \
+  --setup-system-service true \
+  --init-config /path/to/config.yaml
 ```
 
 This will install the AWS IoT Greengrass software in `root`, but will not provision or start the local instance of AWS IoT Greengrass. The next set of steps require connectivity to the Internet to complete.
@@ -69,6 +71,7 @@ Note: The command line below references sample IAM and IoT policy documents loca
 cd ~/greengrassv2-provisioner
 sudo -E python3 -m ggv2_provisioner \
   --root-dir /greengrass/v2 \
+  --gg-install-media-dir ~/GreengrassCore \
   --region YOUR_REGION \
   --thing-name "Test-gg-device" \
   --download-root-ca \
