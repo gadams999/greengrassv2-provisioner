@@ -861,7 +861,7 @@ def install_greengrass(gg_install_media_dir: str, root_dir: str) -> bool:
 
     args = [
         "java",
-        f'-Droot="{str(root_dir)}"',
+        f"-Droot={str(root_dir)}",
         "-Dlog.store=FILE",
         "-jar",
         f'{Path(gg_install_media_dir, "lib", "Greengrass.jar")}',
