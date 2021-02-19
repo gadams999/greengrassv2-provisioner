@@ -95,7 +95,13 @@ def set_debug(level: str) -> str:
 
 def parse_arguments():
     """Parse and validate argument list required for provisioner"""
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        prog="ggv2_provisioner",
+        description="""Provisions new AWS IoT Greengrass 2 installation,
+            to create or reference AWS IoT resources.
+        """,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
 
     # Optional arguments
     parser.add_argument(
@@ -113,6 +119,11 @@ def parse_arguments():
         "--root-dir",
         help="root directory of Greengrass 2 installation",
         default=Path("/greengrass/v2"),
+    )
+    requiredGroup.add_argument(
+        "--gg-install-media-dir",
+        required=True,
+        help="directory with the unzipped Greengrass installation files",
     )
     requiredGroup.add_argument(
         "--component-default-user",
@@ -194,17 +205,17 @@ def parse_arguments():
         type=is_aws_region,
         help='region for Greengrass to provision and connect (e.g., "us-west-2")',
     )
-    requiredGroup.add_argument(
+    parser.add_argument(
         "--iot-data-endpoint",
         required=False,
         type=is_fqdn,
-        help="the AWS IoT data endpoint for your AWS account",
+        help="non-default AWS IoT data endpoint for your AWS account",
     )
-    requiredGroup.add_argument(
+    parser.add_argument(
         "--iot-cred-endpoint",
         required=False,
         type=is_fqdn,
-        help="the AWS IoT credentials endpoint for your account",
+        help="non-default AWS IoT credentials endpoint for your account",
     )
 
     # Perform general argument processing

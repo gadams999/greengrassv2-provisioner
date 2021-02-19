@@ -6,12 +6,13 @@ Once completed, the initial start of AWS IoT Greengrass will read the contents o
 
 ## Installation
 
-Clone the repository and install dependencies
+Clone the repository and install dependencies. As the provisioner is normally only needed for single operations, once the repository is cloned, install the package dependencies under the default user which will be used with the `sudo -E` install command.
 
 ```shell
 cd ~
 git clone https://github.com/gadams999/greengrassv2-provisioner.git
 cd greengrassv2-provisioner
+pip3 install --user -r requirements.txt
 ```
 
 The ggv2-provisioner is supported on Python 3.6 and above.
@@ -33,7 +34,9 @@ sudo -E java -Droot="/greengrass/v2" -Dlog.store=FILE \
   -jar ./GreengrassCore/lib/Greengrass.jar \
   --component-default-user ggc_user:ggc_group \
   --provision false \
-  --start false
+  --start false \
+  --setup-system-service true \
+  --init-config /path/to/config.yaml
 ```
 
 This will install the AWS IoT Greengrass software in `root`, but will not provision or start the local instance of AWS IoT Greengrass. The next set of steps require connectivity to the Internet to complete.
@@ -69,6 +72,7 @@ Note: The command line below references sample IAM and IoT policy documents loca
 cd ~/greengrassv2-provisioner
 sudo -E python3 -m ggv2_provisioner \
   --root-dir /greengrass/v2 \
+  --gg-install-media-dir ~/GreengrassCore \
   --region YOUR_REGION \
   --thing-name "Test-gg-device" \
   --download-root-ca \
