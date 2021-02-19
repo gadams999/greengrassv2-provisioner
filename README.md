@@ -17,38 +17,27 @@ pip3 install --user -r requirements.txt
 
 The ggv2-provisioner is supported on Python 3.6 and above.
 
-> :warning: **You will need to run `ggv2_provisioner` as root (sudo)** - the installation above will place required packages into the root users' directory.
+> :warning: **You will need to run `ggv2_provisioner` as root (sudo)** - the `pip3 install` will place the requirements into the users' directory, and be used through the `sudo -E` flag when calling the _Provisioner_.
 
 ## How to use
 
 ## Install AWS IoT Greengrass
 
-Prior to running the _Provisioner_, first install that AWS IoT Greengrass is installed but not configured or installed.
+Prior to running the _Provisioner_, download and unzip the installation media and set AWS credentials.
 
 Follow the [Setting up AWS IoT Greengrass Version 2](https://docs.aws.amazon.com/greengrass/v2/developerguide/setting-up.html) to verify all dependencies are installed, and next complete the [Install the AWS IoT Greengrass Core software](https://docs.aws.amazon.com/greengrass/v2/developerguide/install-greengrass-core-v2.html) steps 1 through 3 (exporting AWS credentials), then **STOP** (_do not perform step 4_).
-
-From the directory where you unzipped the AWS IoT Greengrass distribution, run the following command to install the AWS IoT Greengrass Core software into the `root` directory (change as needed):
-
-```shell
-sudo -E java -Droot="/greengrass/v2" -Dlog.store=FILE \
-  -jar ./GreengrassCore/lib/Greengrass.jar \
-  --component-default-user ggc_user:ggc_group \
-  --provision false \
-  --start false \
-  --setup-system-service true \
-  --init-config /path/to/config.yaml
-```
-
-This will install the AWS IoT Greengrass software in `root`, but will not provision or start the local instance of AWS IoT Greengrass. The next set of steps require connectivity to the Internet to complete.
 
 ## Provision a New AWS IoT Greengrass Core
 
 Next, run the _Provisioner_ which will do the following:
 
-1. Validate that AWS IoT Greengrass is not running and the installation is in a pristine state
-1. Remove all files in `$ROOT/config` in preparation for the local files
-1. Based on input for creating ore referencing, create a new `$ROOT/config/config.yaml` file used for the initial deployment of the Nucleus
-1. If selected, create a system systemd startup command for AWS IoT Greengrass.
+1. Validate all resource inputs
+1. Create the Greengrass root directory
+1. Create all cloud resources and then save the credentials and rootCA file to the Greengrass root directory
+1. Create the default `config.yaml` in the system's temporary directory
+1. Run the Greengrass installation steps passing in the `config.yaml` and setting up to run as a system service
+
+When finished, Greengrass will be installed and running on the local host.
 
 ### Option 1 - Provision All Resources
 
@@ -72,14 +61,18 @@ Note: The command line below references sample IAM and IoT policy documents loca
 cd ~/greengrassv2-provisioner
 sudo -E python3 -m ggv2_provisioner \
   --root-dir /greengrass/v2 \
+  # Change the directory to where you unzipped the nucleus file
   --gg-install-media-dir ~/GreengrassCore \
+  # Replace with target region
   --region YOUR_REGION \
   --thing-name "Test-gg-device" \
   --download-root-ca \
   --iot-role-alias-name "Test-gg-role-alias" \
   --iam-role-name "Test-gg-role" \
+  # Review and modify as needed
   --iam-policy-file samples/iam_base_permissions.json \
   --iot-policy-name "Test-iot-policy" \
+  # Review and modify as needed
   --iot-policy-file samples/iot_base_permissions.json
 ```
 
@@ -89,23 +82,7 @@ This will complete _all_ the operations needed for a new AWS IoT Greengrass Core
 
 If you already have some of the resources provisions, such as the IAM Role and AWS IoT Role Alias, referencing them by name will have the _Provisioner_ validate the resource exists and then use that. For instance, if an AWS IoT Role Alias name `Test-gg-role-alias` has already been provisioned and references an IAM Role, you can just reference `--iot-role-alias-name "Test-gg-role-alias"`. In this case, the provisioning command would look like:
 
-```shell
-# Run from the ggv2_provisioner directory
-# Replace all "Test-" values with what you want to call the resources
-./ggv2_provisioner.py \
-  --root-dir /greengrass/v2 \
-  --region $GG_REGION \
-  --thing-name "Test-gg-device2" \
-  --download-root-ca \
-  --iot-role-alias-name "Test-gg-role-alias" \
-  --iot-policy-name "Test-iot-policy" \
-  --iot-data-endpoint $IOT_DATA_ENDPOINT \
-  --iot-cred-endpoint $IOT_CREDENTIAL_ENDPOINT
-```
-
-If this command was run after the one above, it will create a new thing named `Test-gg-device2` and a certificate, but will use the _existing_ AWS IoT Role Alias and attach the `Test-iot-policy` AWS IoT Policy to the new certificate. The _Provisioner_ will verify arguments and report with any errors or missing values.
-
-This option can be used provisioning new devices that use the same resources such as fleet provisioning.
+> TODO
 
 ## Caveats
 
